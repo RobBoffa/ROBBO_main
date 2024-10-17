@@ -17,7 +17,7 @@ if isempty(Mode)
 end
 
 %% Anchor Points
-if isempty(Mode.SpecifyAnchorPoints)  % tolerances expressed as percentage of the PF ranges
+if isempty(Mode.SpecifyAnchorPoints) 
     % compute Utopia
     
     % compute weak upper anchor point
@@ -42,12 +42,12 @@ if isempty(Mode.SpecifyAnchorPoints)  % tolerances expressed as percentage of th
     xanc2 = fmincon(@(x)weighted_sum(x,F,W,arg),sub_xanc2,A,b,Aeq,beq,xLB,xUB,@(x)costr_ut(x,F,arg,NL_const,Utopia,2),SolvOptions); 
     anc2   = F(xanc2,arg);
 
-else  % tolerances as absolute values
+else
     anc1 =  Mode.SpecifyAnchorPoints.FirstAnchorPoint;
     anc2 =  Mode.SpecifyAnchorPoints.SecondAnchorPoint;
     xanc1 = Mode.SpecifyAnchorPoints.FirstAnchorSolution;
     xanc2 = Mode.SpecifyAnchorPoints.SecondAnchorSolution;
-    
+
 end
 
 
@@ -89,18 +89,6 @@ end
 
 % Upper bound number of samples for uniform SetMembership sampling
 nsampleUni = ceil(Rdist(1)/(2*sqrt(2)))+1;
-
-if strcmp(Mode.tol,'percentage')  % tolerances expressed as percentage of the PF ranges
-    d1 = dist(1)*tol(1);
-    d2 = dist(2)*tol(2);
-elseif strcmp(Mode.tol,'absolute') % tolerances as absolute values
-    d1 = tol(1);
-    d2 = tol(2);
-else
-     error('Mode.tol must be: percentage, absolute')
-end
-
-
 
 % Uniform partitioning of V0
 Vuni = linspace(Ranc1(1),Ranc2(1),nsampleUni);
@@ -183,8 +171,17 @@ else
     error('Mode.samp must be: greedy, uniform, bisection')
 end
 
+if strcmp(Mode.iterNumber,'manual')  
+    Nsolutions = Nstep-2;
+elseif strcmp(Mode.iterNumber,'auto') 
+    Nsolutions = Mode.Nstop-2;
+else
+     error('Mode.iterNumber must be: manual, auto')
+end
 
-for i = 1:Nstep 
+solutions = zeros(Nsolutions,length(x0));
+
+for i = 1:Nsolutions-2
     Un_max = 0;
     % Compute the next sample coordinate
     if (strcmp(Mode.samp,'greedy') && strcmp(Mode.est,'central'))   ||  strcmp(Mode.samp,'bisection')
@@ -291,6 +288,10 @@ for i = 1:Nstep
     P(:,max_int+1) = Rpnew;
     nsamp  = nsamp+1;
 
+    solutions(max_int+2:nsamp+1,:) = solutions(max_int+1:nsamp,:);
+    solutions(max_int+1,:) = xstar;
+    nsamp  = nsamp+1;
+
     [UB,LB,PF,UN] = Boud(P(:,1:nsamp),Mode.est);
     
     figure(1)
@@ -368,6 +369,7 @@ report.nsamp        = nsamp;
 report.plotQV       = struct('P',P,'UB',UB,'LB',LB,'PF',PF);
 report.plotf1f2     = struct('riP',riP,'riUB',riUB,'riLB',riLB,'riPF',riPF);
 report.input        = struct('BOP',BOP,'tol',tol,'SolvOptions',SolvOptions,'Mode',Mode);
+report.solutions    = solutions;
 end
 
 
