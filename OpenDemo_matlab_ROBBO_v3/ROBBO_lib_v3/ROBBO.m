@@ -13,34 +13,44 @@ x0       =  BOP.x0;
 
 % RBBO default mode
 if isempty(Mode)
-    Mode = struct('tol','percentage','samp','uniform','est',"central");
+    Mode = struct('tol','percentage','samp','uniform','est','central','iterNumber','auto','Nstop',0,'SpecifyAnchorPoints',[]);
 end
 
 %% Anchor Points
+if strcmp(Mode.iterNumber,'auto')  % tolerances expressed as percentage of the PF ranges
+    % compute Utopia
+    
+    % compute weak upper anchor point
+    W = [1, 0];
+    sub_xanc1 = fmincon(@(x)weighted_sum(x,F,W,arg),x0,A,b,Aeq,beq,xLB,xUB,@(x)NL_const(x,arg),SolvOptions); 
+    sub_anc1   = F(sub_xanc1,arg);
+    
+    % compute weak lower anchor point
+    W = [0,1];
+    sub_xanc2 = fmincon(@(x)weighted_sum(x,F,W,arg),x0,A,b,Aeq,beq,xLB,xUB,@(x)NL_const(x,arg),SolvOptions); 
+    sub_anc2   = F(sub_xanc2,arg);
+    
+    Utopia = [sub_anc1(1),sub_anc2(2)]';
+    
+    % compute strong upper anchor point
+    W = [0, 1];
+    xanc1 = fmincon(@(x)weighted_sum(x,F,W,arg),sub_xanc1,A,b,Aeq,beq,xLB,xUB,@(x)costr_ut(x,F,arg,NL_const,Utopia,1),SolvOptions); 
+    anc1   = F(xanc1,arg);
+    
+    % compute strong lower anchor point
+    W = [1, 0];
+    xanc2 = fmincon(@(x)weighted_sum(x,F,W,arg),sub_xanc2,A,b,Aeq,beq,xLB,xUB,@(x)costr_ut(x,F,arg,NL_const,Utopia,2),SolvOptions); 
+    anc2   = F(xanc2,arg);
 
-% compute Utopia
+elseif strcmp(Mode.iterNumber,'manual') % tolerances as absolute values
+    anc1 =  Mode.SpecifyAnchorPoints.FirstAnchorPoint;
+    anc2 =  Mode.SpecifyAnchorPoints.SecondAnchorPoint;
+    xanc1 = Mode.SpecifyAnchorPoints.FirstAnchorSolution;
+    xanc2 = Mode.SpecifyAnchorPoints.SecondAnchorSolution;
+else
+     error('Mode.iterNumber must be: auto, manual')
+end
 
-% compute weak upper anchor point
-W = [1, 0];
-sub_xanc1 = fmincon(@(x)weighted_sum(x,F,W,arg),x0,A,b,Aeq,beq,xLB,xUB,@(x)NL_const(x,arg),SolvOptions); 
-sub_anc1   = F(sub_xanc1,arg);
-
-% compute weak lower anchor point
-W = [0,1];
-sub_xanc2 = fmincon(@(x)weighted_sum(x,F,W,arg),x0,A,b,Aeq,beq,xLB,xUB,@(x)NL_const(x,arg),SolvOptions); 
-sub_anc2   = F(sub_xanc2,arg);
-
-Utopia = [sub_anc1(1),sub_anc2(2)]';
-
-% compute strong upper anchor point
-W = [0, 1];
-xanc1 = fmincon(@(x)weighted_sum(x,F,W,arg),sub_xanc1,A,b,Aeq,beq,xLB,xUB,@(x)costr_ut(x,F,arg,NL_const,Utopia,1),SolvOptions); 
-anc1   = F(xanc1,arg);
-
-% compute strong lower anchor point
-W = [1, 0];
-xanc2 = fmincon(@(x)weighted_sum(x,F,W,arg),sub_xanc2,A,b,Aeq,beq,xLB,xUB,@(x)costr_ut(x,F,arg,NL_const,Utopia,2),SolvOptions); 
-anc2   = F(xanc2,arg);
 
 % compute distances along f1 and f2 axes (PF ranges)
 dist = abs(anc2-anc1); 
