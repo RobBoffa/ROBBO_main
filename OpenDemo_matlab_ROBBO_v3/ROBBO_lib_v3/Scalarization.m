@@ -1,18 +1,20 @@
-function [c,ceq,dc,dceq] = Scalarization(x,F,NL_const,arg,m,q)
-%[f1,f2,df1,df2] =  F(x,arg)        Problem objective functions
-%[c,ceq,dc,dceq] = NL_const(x,arg)  Problem constraint
+function [c,ceq,Dc,Dceq] = Scalarization(x,F,NL_const,arg,m,q,opt)
+% f = [f1,f2,df1,df2] =  F(x,arg)        Problem objective functions
+f = F(x,arg); 
+if opt.SpecifyConstraintGradient && opt.SpecifyObjectiveGradient
+    [c,ceqBOP,Dc,DceqBOP] = NL_const(x,arg);
+    df1 = f(3:2+length(x));
+    df2 = f(3+length(x):end);
+    Dceq = [df2-m*df1, DceqBOP];
 
-outputs = cell(1, 4);
-[outputs{:}]  = NL_const(x,arg); % problem constraints
-f   = F(x,arg);
-c   = outputs{1};
-ceq = [f(2)-m*f(1)-q; outputs{2}];
-dc  = outputs{3};
-if isnan(outputs{4})
-    dceq = outputs{4};
 else
-    dceq = [f(4)-m*f(3); outputs{4}];
-end
+    [c,ceqBOP] = NL_const(x,arg);
+    Dc  = [];
+    Dceq = [];
+end  
+
+ceq = [f(2)-m*f(1)-q; ceqBOP];
+
 
 end
 

@@ -16,32 +16,38 @@ if isempty(Mode)
     Mode = struct('tol','percentage','samp','uniform','est','central','iterNumber','auto','Nstop',0,'SpecifyAnchorPoints',[]);
 end
 
+if isempty(SolvOptions)
+    SolvOptions = optimoptions('fmincon',...
+        'SpecifyConstraintGradient',false,...
+        'SpecifyObjectiveGradient',false);
+end
+
 %% Anchor Points
 if isempty(Mode.SpecifyAnchorPoints) 
     % compute Utopia
     
     % compute weak upper anchor point
     W = [1, 0];
-    sub_xanc1 = fmincon(@(x)weighted_sum(x,F,W,arg),x0,A,b,Aeq,beq,xLB,xUB,@(x)NL_const(x,arg),SolvOptions); 
-    sub_anc1   = F(sub_xanc1,arg);
+    sub_xanc1 = fmincon(@(x)weighted_sum(x,F,W,arg,SolvOptions),x0,A,b,Aeq,beq,xLB,xUB,@(x)NL_const(x,arg),SolvOptions); 
+    fsub_anc1   = F(sub_xanc1,arg);
     
     % compute weak lower anchor point
     W = [0,1];
-    sub_xanc2 = fmincon(@(x)weighted_sum(x,F,W,arg),x0,A,b,Aeq,beq,xLB,xUB,@(x)NL_const(x,arg),SolvOptions); 
-    sub_anc2   = F(sub_xanc2,arg);
+    sub_xanc2 = fmincon(@(x)weighted_sum(x,F,W,arg,SolvOptions),x0,A,b,Aeq,beq,xLB,xUB,@(x)NL_const(x,arg),SolvOptions); 
+    fsub_anc2   = F(sub_xanc2,arg);
     
-    Utopia = [sub_anc1(1),sub_anc2(2)]';
+    Utopia = [fsub_anc1(1),fsub_anc2(2)]';
     
     % compute strong upper anchor point
     W = [0, 1];
-    xanc1 = fmincon(@(x)weighted_sum(x,F,W,arg),sub_xanc1,A,b,Aeq,beq,xLB,xUB,@(x)costr_ut(x,F,arg,NL_const,Utopia,1),SolvOptions); 
-    anc1   = F(xanc1,arg);
-    
+    xanc1 = fmincon(@(x)weighted_sum(x,F,W,arg,SolvOptions),sub_xanc1,A,b,Aeq,beq,xLB,xUB,@(x)costr_ut(x,F,arg,NL_const,Utopia,1,SolvOptions),SolvOptions); 
+    fanch1   = F(xanc1,arg);
+    anc1     = fanch1(1:2);
     % compute strong lower anchor point
     W = [1, 0];
-    xanc2 = fmincon(@(x)weighted_sum(x,F,W,arg),sub_xanc2,A,b,Aeq,beq,xLB,xUB,@(x)costr_ut(x,F,arg,NL_const,Utopia,2),SolvOptions); 
-    anc2   = F(xanc2,arg);
-
+    xanc2 = fmincon(@(x)weighted_sum(x,F,W,arg,SolvOptions),sub_xanc2,A,b,Aeq,beq,xLB,xUB,@(x)costr_ut(x,F,arg,NL_const,Utopia,2,SolvOptions),SolvOptions); 
+    fanch2   = F(xanc2,arg);
+    anc2 = fanch2(1:2);
 else
     anc1 =  Mode.SpecifyAnchorPoints.FirstAnchorPoint;
     anc2 =  Mode.SpecifyAnchorPoints.SecondAnchorPoint;
@@ -180,6 +186,7 @@ else
 end
 
 solutions = zeros(Nsolutions,length(x0));
+solutions([1,2],:) = [xanc1;xanc2];
 
 for i = 1:Nsolutions-2
     Un_max = 0;
@@ -280,8 +287,9 @@ for i = 1:Nsolutions-2
     end
 
     b_cost =   mp(2)-a_cost*mp(1);
-    xstar  = fmincon(@(x)weighted_sum(x,F,W,arg),x0,A,b,Aeq,beq,xLB,xUB,@(x)Scalarization(x,F,NL_const,arg,a_cost,b_cost),SolvOptions);
-    pnew   = F(xstar,arg);
+    xstar  = fmincon(@(x)weighted_sum(x,F,W,arg,SolvOptions),x0,A,b,Aeq,beq,xLB,xUB,@(x)Scalarization(x,F,NL_const,arg,a_cost,b_cost,SolvOptions),SolvOptions);
+    fpnew  = F(xstar,arg);
+    pnew   = fpnew(1:2);
     Rpnew  = R*pnew;
 
     P(:,max_int+2:nsamp+1) = P(:,max_int+1:nsamp);
@@ -290,7 +298,7 @@ for i = 1:Nsolutions-2
 
     solutions(max_int+2:nsamp+1,:) = solutions(max_int+1:nsamp,:);
     solutions(max_int+1,:) = xstar;
-    nsamp  = nsamp+1;
+
 
     [UB,LB,PF,UN] = Boud(P(:,1:nsamp),Mode.est);
     
@@ -369,7 +377,7 @@ report.nsamp        = nsamp;
 report.plotQV       = struct('P',P,'UB',UB,'LB',LB,'PF',PF);
 report.plotf1f2     = struct('riP',riP,'riUB',riUB,'riLB',riLB,'riPF',riPF);
 report.input        = struct('BOP',BOP,'tol',tol,'SolvOptions',SolvOptions,'Mode',Mode);
-report.solutions    = solutions;
+report.solutions    = solutions(1:nsamp,:);
 end
 
 
