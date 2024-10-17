@@ -17,7 +17,7 @@ if isempty(Mode)
 end
 
 %% Anchor Points
-if strcmp(Mode.iterNumber,'auto')  % tolerances expressed as percentage of the PF ranges
+if isempty(Mode.SpecifyAnchorPoints)  % tolerances expressed as percentage of the PF ranges
     % compute Utopia
     
     % compute weak upper anchor point
@@ -42,13 +42,12 @@ if strcmp(Mode.iterNumber,'auto')  % tolerances expressed as percentage of the P
     xanc2 = fmincon(@(x)weighted_sum(x,F,W,arg),sub_xanc2,A,b,Aeq,beq,xLB,xUB,@(x)costr_ut(x,F,arg,NL_const,Utopia,2),SolvOptions); 
     anc2   = F(xanc2,arg);
 
-elseif strcmp(Mode.iterNumber,'manual') % tolerances as absolute values
+else  % tolerances as absolute values
     anc1 =  Mode.SpecifyAnchorPoints.FirstAnchorPoint;
     anc2 =  Mode.SpecifyAnchorPoints.SecondAnchorPoint;
     xanc1 = Mode.SpecifyAnchorPoints.FirstAnchorSolution;
     xanc2 = Mode.SpecifyAnchorPoints.SecondAnchorSolution;
-else
-     error('Mode.iterNumber must be: auto, manual')
+    
 end
 
 
@@ -90,6 +89,18 @@ end
 
 % Upper bound number of samples for uniform SetMembership sampling
 nsampleUni = ceil(Rdist(1)/(2*sqrt(2)))+1;
+
+if strcmp(Mode.tol,'percentage')  % tolerances expressed as percentage of the PF ranges
+    d1 = dist(1)*tol(1);
+    d2 = dist(2)*tol(2);
+elseif strcmp(Mode.tol,'absolute') % tolerances as absolute values
+    d1 = tol(1);
+    d2 = tol(2);
+else
+     error('Mode.tol must be: percentage, absolute')
+end
+
+
 
 % Uniform partitioning of V0
 Vuni = linspace(Ranc1(1),Ranc2(1),nsampleUni);
